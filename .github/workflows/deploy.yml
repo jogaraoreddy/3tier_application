@@ -89,10 +89,9 @@ jobs:
           git pull origin main
           
           # ◄ ADD THIS DIAGNOSTIC LINE TO PRINT FOLDERS:
-          ls -la
+        
           
           helm upgrade --install ${{ github.event.inputs.tier }}-release ./${{ github.event.inputs.tier }} \
             --namespace 3-tier-app \
             --set image.tag=${{ github.event.inputs.image_tag }} \
             --create-namespace \
-            --wait
