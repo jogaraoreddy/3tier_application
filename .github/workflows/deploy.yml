@@ -29,7 +29,6 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-     Tar # Set up Docker Buildx
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -80,7 +79,7 @@ jobs:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USERNAME }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: ${{ secrets.SSH_PORT }} # ◄ Change '22' to this
+        port: ${{ secrets.SSH_PORT }}
         script: |
           # 1. Target your specific EKS cluster (Modify cluster name/region)
           aws eks update-kubeconfig --region us-east-1 --name my-eks-cluster
