@@ -81,16 +81,16 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
-          # 1. Ensure the repository exists on your local machine, or clone it
           if [ ! -d "3tier_application" ]; then
             git clone https://github.com/jogaraoreddy/3tier_application.git
           fi
           
-          # 2. Enter the repository directory and pull latest changes
           cd 3tier_application
           git pull origin main
           
-          # 3. Run the Helm deployment locally
+          # ◄ ADD THIS DIAGNOSTIC LINE TO PRINT FOLDERS:
+          ls -la
+          
           helm upgrade --install ${{ github.event.inputs.tier }}-release ./${{ github.event.inputs.tier }} \
             --namespace 3-tier-app \
             --set image.tag=${{ github.event.inputs.image_tag }} \
