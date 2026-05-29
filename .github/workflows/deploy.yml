@@ -72,8 +72,8 @@ jobs:
         push: true
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
 
-    # SSH to Bastion Server and Deploy to EKS
-    - name: SSH to Bastion and Deploy via Helm
+# SSH to Local Machine and Deploy via Helm
+    - name: SSH to Local Machine & Run Helm
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.SSH_HOST }}
@@ -81,11 +81,18 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script: |
-          # 1. Target your specific EKS cluster (Modify cluster name/region)
-          aws eks update-kubeconfig --region us-east-1 --name my-eks-cluster
+          # 1. Ensure the repository exists on your local machine, or clone it
+          if [ ! -d "3tier_application" ]; then
+            git clone https://github.com/jogaraoreddy/3tier_application.git
+          fi
           
-          # 2. Update Helm Release
+          # 2. Enter the repository directory and pull latest changes
+          cd 3tier_application
+          git pull origin main
+          
+          # 3. Run the Helm deployment locally
           helm upgrade --install ${{ github.event.inputs.tier }}-release ./${{ github.event.inputs.tier }} \
             --namespace 3-tier-app \
             --set image.tag=${{ github.event.inputs.image_tag }} \
+            --create-namespace \
             --wait
