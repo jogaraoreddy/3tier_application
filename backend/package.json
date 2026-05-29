@@ -7,8 +7,9 @@
     "start": "node app.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "mysql2": "^3.6.0"
+    "cross-spawn": "^7.0.5",
+    "glob": "^11.1.0",
+    "minimatch": "^9.0.7",
+    "tar": "^7.5.4"
   }
 }
