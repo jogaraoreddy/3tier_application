@@ -85,7 +85,7 @@ jobs:
           aws eks update-kubeconfig --region us-east-1 --name my-eks-cluster
           
           # 2. Update Helm Release
-          helm upgrade --install ${{ github.event.inputs.tier }}-release ./charts/${{ github.event.inputs.tier }} \
+          helm upgrade --install ${{ github.event.inputs.tier }}-release ./${{ github.event.inputs.tier }} \
             --namespace 3-tier-app \
             --set image.tag=${{ github.event.inputs.image_tag }} \
             --wait
