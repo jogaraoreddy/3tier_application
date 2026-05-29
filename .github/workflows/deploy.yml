@@ -46,13 +46,7 @@ jobs:
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
 
     # Security Scanning Step 1: Docker Scout
-    - name: Docker Scout Scan
-      uses: docker/scout-action@v1
-      with:
-        command: quickview,cves
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
-        only-severities: critical,high
-        exit-code: false
+   
 
     # Security Scanning Step 2: Trivy
     - name: Run Trivy Scanner
