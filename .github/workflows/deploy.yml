@@ -1,90 +1,92 @@
-name: 3-Tier App CI/CD Pipeline
+name: Manual Build and Deploy 3-Tier App
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker Image Tag'
+        required: true
+        default: 'BD-2023'
+      tier:
+        description: 'App Tier to deploy'
+        required: true
+        type: choice
+        options:
+          - frontend
+          - backend
+          - database
+        default: 'backend'
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: jogaraoreddy/${{ github.event.inputs.tier }}-app 
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Images
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: massey123
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+     Tar # Set up Docker Buildx
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Frontend Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            massey123/3tier-frontend:${{ github.sha }}
-            massey123/3tier-frontend:latest
+    - name: Build Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./${{ github.event.inputs.tier }}
+        load: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
 
-      - name: Build and Push Backend Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: |
-            massey123/3tier-backend:${{ github.sha }}
-            massey123/3tier-backend:latest
+    # Security Scanning Step 1: Docker Scout
+    - name: Docker Scout Scan
+      uses: docker/scout-action@v1
+      with:
+        command: quickview,cves
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+        only-severities: critical,high
+        exit-code: true 
 
-      - name: Summary
-        run: |
-          echo "✅ Frontend pushed → massey123/3tier-frontend:latest"
-          echo "✅ Backend  pushed → massey123/3tier-backend:latest"
+    # Security Scanning Step 2: Trivy
+    - name: Run Trivy Scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}'
+        format: 'table'
+        exit-code: '1' 
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
 
-  deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest
-    needs: build-and-push
+    - name: Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./${{ github.event.inputs.tier }}
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,database/init.sql"
-          target: "/home/ubuntu/3tier_application"
-
-      - name: SSH and Deploy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            cd /home/ubuntu/3tier_application
-            echo "Logging into DockerHub..."
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u massey123 --password-stdin
-            echo "Pulling latest images..."
-            docker pull massey123/3tier-frontend:latest
-            docker pull massey123/3tier-backend:latest
-            echo "Stopping old containers..."
-            docker-compose down --remove-orphans || true
-            echo "Starting all containers..."
-            docker-compose up -d
-            echo "Waiting 20s for DB to be ready..."
-            sleep 20
-            echo "Container status:"
-            docker-compose ps
-            echo "Deployment complete!"
-            echo "Frontend : http://${{ secrets.EC2_HOST }}"
-            echo "Backend  : http://${{ secrets.EC2_HOST }}:5000/health"
+    # SSH to Bastion Server and Deploy to EKS
+    - name: SSH to Bastion and Deploy via Helm
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          # 1. Target your specific EKS cluster (Modify cluster name/region)
+          aws eks update-kubeconfig --region us-east-1 --name my-eks-cluster
+          
+          # 2. Update Helm Release
+          helm upgrade --install ${{ github.event.inputs.tier }}-release ./charts/${{ github.event.inputs.tier }} \
+            --namespace 3-tier-app \
+            --set image.tag=${{ github.event.inputs.image_tag }} \
+            --wait
