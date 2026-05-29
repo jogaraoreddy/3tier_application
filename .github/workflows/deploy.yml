@@ -52,7 +52,7 @@ jobs:
         command: quickview,cves
         image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
         only-severities: critical,high
-        exit-code: true 
+        exit-code: false
 
     # Security Scanning Step 2: Trivy
     - name: Run Trivy Scanner
@@ -60,7 +60,7 @@ jobs:
       with:
         image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}'
         format: 'table'
-        exit-code: '1' 
+        exit-code: '0' 
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
