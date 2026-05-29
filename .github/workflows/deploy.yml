@@ -88,4 +88,4 @@ jobs:
           helm upgrade --install ${{ github.event.inputs.tier }}-release ./${{ github.event.inputs.tier }} \
             --namespace 3-tier-app \
             --set image.tag=${{ github.event.inputs.image_tag }} \
-            --create-namespace \
+            --create-namespace 
