@@ -1,4 +1,4 @@
-#dockerfile
+#docker-file for the backend
 FROM node:18-alpine
 RUN apk update && apk upgrade --no-cache
 WORKDIR /app
