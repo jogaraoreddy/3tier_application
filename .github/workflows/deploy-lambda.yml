@@ -1,0 +1,47 @@
+name: Deploy Serverless AWS Lambda
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Lambda Image Version'
+        required: true
+        default: 'LAMBDA-2026'
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: my-lambda-backend-repo
+
+jobs:
+  deploy-serverless:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Log in to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and Package Serverless Container
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        # Build image configured with AWS Lambda Web Adapter runtime base
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.image_tag }} ./backend
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.image_tag }}
+
+    - name: Update Lambda Function Code
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        aws lambda update-function-code \
+          --function-name my-three-tier-backend-function \
+          --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.image_tag }}
