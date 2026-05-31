@@ -1,0 +1,61 @@
+name: Deploy to AWS EKS / ECS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image Tag'
+        required: true
+        default: 'AWS-2026'
+      tier:
+        description: 'App Tier'
+        required: true
+        type: choice
+        options:
+          - frontend
+          - backend
+        default: 'backend'
+
+env:
+  AWS_REGION: us-east-1
+  REGISTRY: docker.io
+  IMAGE_NAME: jogaraoreddy/${{ github.event.inputs.tier }}-app
+
+jobs:
+  build-and-cloud-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and Push Image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./${{ github.event.inputs.tier }}
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}
+
+    # Option A: If using AWS EKS (Kubernetes)
+    - name: Deploy to Amazon EKS
+      run: |
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name my-production-eks-cluster
+        
+        # Navigate to helm configurations or run raw manifests
+        cd ${{ github.event.inputs.tier }}
+        helm upgrade --install ${{ github.event.inputs.tier }}-release . \
+          --namespace cloud-apps \
+          --set image.tag=${{ github.event.inputs.image_tag }} \
+          --create-namespace
